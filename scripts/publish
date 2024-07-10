@@ -1,0 +1,59 @@
+#!/usr/bin/env -S -- bash -Eeu -O dotglob -O nullglob -O extglob -O failglob -O globstar
+
+set -o pipefail
+
+if ! [[ -v GPG_SIGNING_PASSWORD ]] || ! [[ -v GPG_SIGNING_KEY ]]; then
+  printf -- '%s\n' "GPG_SIGNING_PASSWORD, GPG_SIGNING_KEY must be set" >&2
+  exit 1
+fi
+
+# Environments
+{
+  cd -- "$(dirname -- "$0")/.."
+  GIT_REPO="${GIT_REPO:-"$(basename -- "$PWD")"}"
+  GIT_TAG="$(git describe --tags --abbrev=0)"
+  VERSION="${GIT_TAG#v}"
+  NAME_PREFIX="${GIT_REPO}_${VERSION}"
+  DIST="$PWD/dist"
+  ZIPS=()
+  MANIFEST="$DIST/${NAME_PREFIX}_manifest.json"
+  SHAFILE="$DIST/${NAME_PREFIX}_SHA256SUMS"
+  SIGFILE="$SHAFILE.sig"
+  export -- GPG_FINGERPRINT
+}
+
+# Import GPG Key
+{
+  printenv -- GPG_SIGNING_KEY | gpg --batch --yes --passphrase-fd 3 --import 3<<< "$GPG_SIGNING_PASSWORD"
+  GPG_FINGERPRINT="$(gpg --batch --list-keys --with-colons | awk -F : -- '/^pub:/ { getline; print "fingerprint=" $10 }')"
+}
+
+# Build Artifacts
+{
+  SKIP=(--skip publish)
+  if ! [[ -v CI ]]; then
+    SKIP+=(--skip validate)
+  fi
+
+  goreleaser release --clean "${SKIP[@]}"
+
+  for DIR in "$DIST/"*/*/; do
+    ZIP="${DIR%%/}.zip"
+    ZIPS+=("$ZIP")
+    zip --junk-paths --recurse-paths "$ZIP" "$DIR"
+  done
+}
+
+# Sign Release
+{
+  cp -v -- ./terraform-registry-manifest.json "$MANIFEST"
+  sha256sum -- "$MANIFEST" "${ZIPS[@]}" > "$SHAFILE"
+  gpg --batch --detach-sign --local-user "$GPG_FINGERPRINT" --output "$SIGFILE" -- "$SHAFILE"
+}
+
+# Publish Release
+if [[ -v CI ]]; then
+  gh release upload --clobber -- "$GIT_TAG" "$MANIFEST" "$SHAFILE" "${ZIPS[@]}"
+  gh release edit --draft=false -- "$GIT_TAG"
+fi
+

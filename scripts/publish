@@ -37,6 +37,8 @@ fi
 
   goreleaser release --clean "${SKIP[@]}"
 
+  ls -R -- "$DIST"
+
   for DIR in "$DIST/"*/*/; do
     ZIP="${DIR%%/}.zip"
     ZIPS+=("$ZIP")

@@ -3,7 +3,9 @@ name: Publish Draft Release with Binaries
 
 on:
   release:
-    types: [created, edited]
+
+permissions:
+  contents: write
 
 jobs:
   publish:
@@ -20,8 +22,7 @@ jobs:
           sudo -- snap install --classic goreleaser
 
       - env:
-          GITHUB_REPOSITORY: ${{ github.repository }}
-          GITHUB_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
           GPG_SIGNING_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
           GPG_SIGNING_PASSWORD: ${{ secrets.GPG_SIGNING_PASSWORD }}
         run: |-

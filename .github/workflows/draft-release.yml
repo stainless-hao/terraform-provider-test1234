@@ -22,7 +22,7 @@ jobs:
         run: |-
           set -x
           TAG="$(git describe --tags --abbrev=0)"
-          EMAIL="$(git log --format="%aE" "$TAG")"
+          EMAIL="$(git log --format="%aE" "$TAG^!")"
           git config --global user.email -- "$EMAIL"
           git config --global user.name -- "$GH_USER"
           gh release create -- "$TAG"

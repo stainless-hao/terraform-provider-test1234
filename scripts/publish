@@ -37,18 +37,18 @@ fi
 {
   cp -v -- ./terraform-registry-manifest.json "$DIST/$MANIFEST"
   pushd -- "$DIST" > /dev/null
-  sha256sum -- "$MANIFEST" *.zip | tee -- "$SHAFILE"
+  sha256sum -- "$MANIFEST" *.zip | tee -- "$SHAFILE" >&2
   popd > /dev/null
 }
 
 # Generate Signature
 {
   GPG_FINGERPRINT="${GPG_FINGERPRINT:-"$(gpg --batch --list-keys --with-colons | awk -F : -- '/^pub:/ { getline; print $10 }' | tail -1)"}"
-  gpg --batch --pinentry-mode loopback --passphrase-fd 0 --detach-sign --local-user "$GPG_FINGERPRINT" --output "$SIGFILE" -- "$SHAFILE" <<< "$GPG_SIGNING_PASSWORD"
+  gpg --batch --pinentry-mode loopback --passphrase-fd 0 --detach-sign --local-user "$GPG_FINGERPRINT" --output "$SIGFILE" -- "$SHAFILE" <<< "${GPG_SIGNING_PASSWORD:-""}"
 }
 
 # Publish Release
 if [[ -v CI ]]; then
-  gh release upload --clobber -- "$GIT_TAG" "$DIST/$MANIFEST" "$SHAFILE" "$SIGFILE"
+  gh release upload --clobber -- "$GIT_TAG" "$DIST/$MANIFEST" "$SHAFILE" "$SIGFILE" "$DIST/"*.zip
   gh release edit --draft=false -- "$GIT_TAG"
 fi

@@ -2,11 +2,6 @@
 
 set -o pipefail
 
-if ! [[ -v GPG_SIGNING_PASSWORD ]] || ! [[ -v GPG_SIGNING_KEY ]]; then
-  printf -- '%s\n' "GPG_SIGNING_PASSWORD, GPG_SIGNING_KEY must be set" >&2
-  exit 1
-fi
-
 # Environments
 {
   cd -- "$(dirname -- "$0")/.."
@@ -14,19 +9,19 @@ fi
   GIT_TAG="$(git describe --tags --abbrev=0)"
   VERSION="${GIT_TAG#v}"
   NAME_PREFIX="${GIT_REPO}_${VERSION}"
-  DIST="./dist"
-  ZIPS=()
-  MANIFEST="$DIST/${NAME_PREFIX}_manifest.json"
+  MANIFEST="${NAME_PREFIX}_manifest.json"
+  DIST="$PWD/dist"
   SHAFILE="$DIST/${NAME_PREFIX}_SHA256SUMS"
   SIGFILE="$SHAFILE.sig"
-  export -- GPG_FINGERPRINT
 }
 
 # Import GPG Key
-{
+if [[ -v GPG_SIGNING_PASSWORD ]] && [[ -v GPG_SIGNING_KEY ]]; then
   printenv -- GPG_SIGNING_KEY | gpg --batch --passphrase-fd 3 --import 3<<< "$GPG_SIGNING_PASSWORD"
-  GPG_FINGERPRINT="$(gpg --batch --list-keys --with-colons | awk -F : -- '/^pub:/ { getline; print $10 }' | tail -1)"
-}
+elif [[ -v CI ]]; then
+  printf -- '%s\n' "GPG_SIGNING_PASSWORD, GPG_SIGNING_KEY must be set" >&2
+  exit 1
+fi
 
 # Build Artifacts
 {
@@ -39,20 +34,23 @@ fi
 
   for DIR in "$DIST/"*/*/; do
     ZIP="${DIR%%/}.zip"
-    ZIPS+=("$ZIP")
     zip --junk-paths --recurse-paths "$ZIP" "$DIR"
+    mv -v -- "$ZIP" "$DIR/"
   done
 }
 
 # Sign Release
 {
-  cp -v -- ./terraform-registry-manifest.json "$MANIFEST"
-  sha256sum -- "$MANIFEST" "${ZIPS[@]}" > "$SHAFILE"
+  cp -v -- ./terraform-registry-manifest.json "$DIST/$MANIFEST"
+  pushd -- "$DIST" > /dev/null
+  sha256sum -- "$MANIFEST" *.zip > "$SHAFILE"
+  popd > /dev/null
+  GPG_FINGERPRINT="${GPG_FINGERPRINT:-"$(gpg --batch --list-keys --with-colons | awk -F : -- '/^pub:/ { getline; print $10 }' | tail -1)"}"
   gpg --batch --pinentry-mode loopback --passphrase-fd 0 --detach-sign --local-user "$GPG_FINGERPRINT" --output "$SIGFILE" -- "$SHAFILE" <<< "$GPG_SIGNING_PASSWORD"
 }
 
 # Publish Release
 if [[ -v CI ]]; then
-  gh release upload --clobber -- "$GIT_TAG" "$MANIFEST" "$SHAFILE" "$SIGFILE" "${ZIPS[@]}"
+  gh release upload --clobber -- "$GIT_TAG" "$DIST/$MANIFEST" "$SHAFILE" "$SIGFILE"
   gh release edit --draft=false -- "$GIT_TAG"
 fi

@@ -4,6 +4,7 @@ name: Publish Draft Release with Binaries
 on:
   workflow_dispatch:
   push:
+    #
     tags:
       - "_v*"
 

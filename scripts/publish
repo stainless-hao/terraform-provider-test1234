@@ -7,8 +7,6 @@ if ! [[ -v GPG_SIGNING_PASSWORD ]] || ! [[ -v GPG_SIGNING_KEY ]]; then
   exit 1
 fi
 
-set -x
-
 # Environments
 {
   cd -- "$(dirname -- "$0")/.."
@@ -38,8 +36,6 @@ set -x
   fi
 
   goreleaser release --clean "${SKIP[@]}"
-
-  ls -R -- "$DIST"
 
   for DIR in "$DIST/"*/*/; do
     ZIP="${DIR%%/}.zip"

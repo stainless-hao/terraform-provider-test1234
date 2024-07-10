@@ -1,6 +1,7 @@
-#!/usr/bin/env -S -- bash -Eeu -O dotglob -O nullglob -O extglob -O failglob -O globstar
+#!/usr/bin/env bash
 
-set -o pipefail
+set -Eeu
+set -o pipefail dotglob nullglob failglob
 
 # Environments
 {
@@ -16,9 +17,9 @@ set -o pipefail
 }
 
 # Import GPG Key
-if [[ -v GPG_SIGNING_PASSWORD ]] && [[ -v GPG_SIGNING_KEY ]]; then
+if [[ -n ${GPG_SIGNING_PASSWORD:-""} ]] && [[ -n ${GPG_SIGNING_KEY:-""} ]]; then
   printenv -- GPG_SIGNING_KEY | gpg --batch --passphrase-fd 3 --import 3<<< "$GPG_SIGNING_PASSWORD"
-elif [[ -v CI ]]; then
+elif [[ -n ${CI:-""} ]]; then
   printf -- '%s\n' "GPG_SIGNING_PASSWORD, GPG_SIGNING_KEY must be set" >&2
   exit 1
 fi
@@ -26,7 +27,7 @@ fi
 # Build Artifacts
 {
   SKIP=(--skip publish)
-  if ! [[ -v CI ]]; then
+  if [[ -z ${CI:-""} ]]; then
     SKIP+=(--skip validate)
   fi
 
@@ -48,7 +49,7 @@ fi
 }
 
 # Publish Release
-if [[ -v CI ]]; then
+if [[ -n ${CI:-""} ]]; then
   gh release upload --clobber -- "$GIT_TAG" "$DIST/$MANIFEST" "$SHAFILE" "$SIGFILE" "$DIST/"*.zip
   gh release edit --draft=false -- "$GIT_TAG"
 fi

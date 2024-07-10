@@ -3,8 +3,9 @@ name: Publish Draft Release with Binaries
 
 on:
   workflow_dispatch:
-  release:
-    types: [created, edited]
+  push:
+    tags:
+      - "_v*"
 
 permissions:
   contents: write
@@ -17,6 +18,12 @@ jobs:
         with:
           # Allow goreleaser to access older tag information.
           fetch-depth: 0
+
+      - env:
+          TAG: ${{ github.ref }}
+        run: |-
+          git tag --delete -- "$TAG"
+          git push --tags
 
       - uses: actions/setup-go@v5
 

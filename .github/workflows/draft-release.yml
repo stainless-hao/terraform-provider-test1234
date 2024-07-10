@@ -19,4 +19,6 @@ jobs:
       - env:
           GH_TOKEN: ${{ github.token }}
         run: |-
-          git describe --tags --abbrev=0 | tee -- /dev/stderr | xargs -r -- gh release create --
+          TAG="$(git describe --tags --abbrev=0)"
+          gh release create -- "$TAG"
+          git tag --message '' -- "_$TAG"

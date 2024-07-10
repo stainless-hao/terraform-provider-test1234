@@ -3,6 +3,8 @@
 set -Eeu
 set -o pipefail dotglob nullglob failglob
 
+set -x
+
 # Environments
 {
   cd -- "$(dirname -- "$0")/.."

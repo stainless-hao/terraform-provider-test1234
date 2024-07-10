@@ -26,5 +26,5 @@ jobs:
           git config --global user.email -- "$EMAIL"
           git config --global user.name -- "$GH_USER"
           git tag --message '' -- "_$TAG"
-          git push --tags -- "_$TAG"
+          git push origin "_$TAG"
           gh release create -- "$TAG"

@@ -27,12 +27,7 @@ fi
 
 # Build Artifacts
 {
-  SKIP=(--skip publish)
-  if [[ -z ${CI:-""} ]]; then
-    SKIP+=(--skip validate)
-  fi
-
-  GORELEASER_CURRENT_TAG="$GIT_TAG" goreleaser release --clean "${SKIP[@]}"
+  GORELEASER_CURRENT_TAG="$GIT_TAG" goreleaser release --clean --skip publish,validate
 }
 
 # Generate Checksum

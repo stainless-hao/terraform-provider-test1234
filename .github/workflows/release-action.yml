@@ -25,7 +25,7 @@ jobs:
         run: |-
           TAG="$(basename -- "$REF")"
           git tag --delete -- "$TAG"
-          git push --tags
+          git push --delete origin "$TAG"
 
       - uses: actions/setup-go@v5
 

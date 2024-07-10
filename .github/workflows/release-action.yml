@@ -23,6 +23,7 @@ jobs:
       - env:
           REF: ${{ github.ref }}
         run: |-
+          set -x
           TAG="$(basename -- "$REF")"
           git tag --delete -- "$TAG"
           git push --delete origin "$TAG"

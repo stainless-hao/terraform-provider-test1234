@@ -8,5 +8,12 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
-      - run: |-
-          gh release create --draft -- ${{ github.ref }}
+      - uses: actions/checkout@v4
+        with:
+          # Allow goreleaser to access older tag information.
+          fetch-depth: 0
+
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: |-
+          git describe --tags --abbrev=0 | xargs -r -- gh release create --draft --

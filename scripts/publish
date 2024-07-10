@@ -37,7 +37,7 @@ fi
 
   goreleaser release --clean "${SKIP[@]}"
 
-  for DIR in "$DIST/"*/*/; do
+  for DIR in "$DIST/"**/; do
     ZIP="${DIR%%/}.zip"
     ZIPS+=("$ZIP")
     zip --junk-paths --recurse-paths "$ZIP" "$DIR"

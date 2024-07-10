@@ -21,8 +21,9 @@ jobs:
           fetch-depth: 0
 
       - env:
-          TAG: ${{ github.ref }}
+          REF: ${{ github.ref }}
         run: |-
+          TAG="$(basename -- "$REF")"
           git tag --delete -- "$TAG"
           git push --tags
 

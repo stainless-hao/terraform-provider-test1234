@@ -3,8 +3,6 @@
 set -Eeu
 set -o pipefail dotglob nullglob failglob
 
-set -x
-
 # Environments
 {
   cd -- "$(dirname -- "$0")/.."
@@ -33,7 +31,7 @@ fi
     SKIP+=(--skip validate)
   fi
 
-  goreleaser release --clean "${SKIP[@]}"
+  GORELEASER_CURRENT_TAG="$GIT_TAG" goreleaser release --clean "${SKIP[@]}"
 }
 
 # Generate Checksum

@@ -8,6 +8,7 @@ set -o pipefail dotglob nullglob failglob
   cd -- "$(dirname -- "$0")/.."
   GIT_REPO="${GIT_REPO:-"$(basename -- "$PWD")"}"
   GIT_TAG="$(git describe --tags --abbrev=0)"
+  GIT_TAG="${GIT_TAG#_}"
   VERSION="${GIT_TAG#v}"
   NAME_PREFIX="${GIT_REPO}_${VERSION}"
   MANIFEST="${NAME_PREFIX}_manifest.json"

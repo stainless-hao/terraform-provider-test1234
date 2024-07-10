@@ -25,7 +25,7 @@ fi
 # Import GPG Key
 {
   printenv -- GPG_SIGNING_KEY | gpg --batch --passphrase-fd 3 --import 3<<< "$GPG_SIGNING_PASSWORD"
-  GPG_FINGERPRINT="$(gpg --batch --list-keys --with-colons | awk -F : -- '/^pub:/ { getline; print $10 }')"
+  GPG_FINGERPRINT="$(gpg --batch --list-keys --with-colons | awk -F : -- '/^pub:/ { getline; print $10 }' | tail -1)"
 }
 
 # Build Artifacts

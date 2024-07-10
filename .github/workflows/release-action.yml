@@ -2,13 +2,9 @@
 name: Publish Draft Release with Binaries
 
 on:
+  workflow_dispatch:
   release:
-    types:
-      - created
-      - edited
-      - prereleased
-      - published
-      - released
+    types: [created, published]
 
 permissions:
   contents: write

@@ -24,7 +24,7 @@ fi
 
 # Import GPG Key
 {
-  printenv -- GPG_SIGNING_KEY | gpg --batch --yes --passphrase-fd 3 --import 3<<< "$GPG_SIGNING_PASSWORD"
+  printenv -- GPG_SIGNING_KEY | gpg --batch --passphrase-fd 3 --import 3<<< "$GPG_SIGNING_PASSWORD"
   GPG_FINGERPRINT="$(gpg --batch --list-keys --with-colons | awk -F : -- '/^pub:/ { getline; print $10 }')"
 }
 
@@ -48,7 +48,7 @@ fi
 {
   cp -v -- ./terraform-registry-manifest.json "$MANIFEST"
   sha256sum -- "$MANIFEST" "${ZIPS[@]}" > "$SHAFILE"
-  gpg --batch --detach-sign --local-user "$GPG_FINGERPRINT" --output "$SIGFILE" -- "$SHAFILE"
+  gpg --batch --passphrase-fd 1 --detach-sign --local-user "$GPG_FINGERPRINT" --output "$SIGFILE" -- "$SHAFILE" <<< "$GPG_SIGNING_PASSWORD"
 }
 
 # Publish Release

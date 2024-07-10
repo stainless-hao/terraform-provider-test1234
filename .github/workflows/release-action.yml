@@ -4,6 +4,9 @@ name: Publish Draft Release with Binaries
 on:
   release:
     types:
+      - created
+      - edited
+      - prereleased
       - published
       - released
 

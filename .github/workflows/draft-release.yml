@@ -18,7 +18,10 @@ jobs:
 
       - env:
           GH_TOKEN: ${{ github.token }}
+          GH_USER: ${{ github.actor }}
         run: |-
+          # git config --global user.email -- 
+          git config --global user.name -- "$GH_USER"
           TAG="$(git describe --tags --abbrev=0)"
           gh release create -- "$TAG"
           git tag --message '' -- "_$TAG"

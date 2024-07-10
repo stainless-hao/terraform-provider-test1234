@@ -21,6 +21,5 @@ func main() {
 	if err := os.Chdir(dir); err != nil {
 		log.Panicln(err)
 	}
-	fmt.Println(dir)
-
+	fmt.Println(self)
 }

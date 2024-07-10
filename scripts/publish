@@ -31,20 +31,18 @@ fi
   fi
 
   goreleaser release --clean "${SKIP[@]}"
-
-  for DIR in "$DIST/"*/*/; do
-    ZIP="${DIR%%/}.zip"
-    zip --junk-paths --recurse-paths "$ZIP" "$DIR"
-    mv -v -- "$ZIP" "$DIR/"
-  done
 }
 
-# Sign Release
+# Generate Checksum
 {
   cp -v -- ./terraform-registry-manifest.json "$DIST/$MANIFEST"
   pushd -- "$DIST" > /dev/null
-  sha256sum -- "$MANIFEST" *.zip > "$SHAFILE"
+  sha256sum -- "$MANIFEST" *.zip | tee -- "$SHAFILE"
   popd > /dev/null
+}
+
+# Generate Signature
+{
   GPG_FINGERPRINT="${GPG_FINGERPRINT:-"$(gpg --batch --list-keys --with-colons | awk -F : -- '/^pub:/ { getline; print $10 }' | tail -1)"}"
   gpg --batch --pinentry-mode loopback --passphrase-fd 0 --detach-sign --local-user "$GPG_FINGERPRINT" --output "$SIGFILE" -- "$SHAFILE" <<< "$GPG_SIGNING_PASSWORD"
 }

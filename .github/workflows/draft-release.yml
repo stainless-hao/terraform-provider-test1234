@@ -16,15 +16,15 @@ jobs:
           # Allow goreleaser to access older tag information.
           fetch-depth: 0
 
-      # - env:
-      #     GH_TOKEN: ${{ github.token }}
-      #     GH_USER: ${{ github.actor }}
-      #   run: |-
-      #     set -x
-      #     TAG="$(git describe --tags --abbrev=0)"
-      #     EMAIL="$(git log --format="%aE" "$TAG^!")"
-      #     git config --global user.email -- "$EMAIL"
-      #     git config --global user.name -- "$GH_USER"
-      #     git tag --message '' -- "_$TAG"
-      #     git push origin "_$TAG"
-      #     gh release create -- "$TAG"
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          GH_USER: ${{ github.actor }}
+        run: |-
+          set -x
+          TAG="$(git describe --tags --abbrev=0)"
+          EMAIL="$(git log --format="%aE" "$TAG^!")"
+          git config --global user.email -- "$EMAIL"
+          git config --global user.name -- "$GH_USER"
+          git tag --message '' -- "_$TAG"
+          git push origin "_$TAG"
+          gh release create -- "$TAG"

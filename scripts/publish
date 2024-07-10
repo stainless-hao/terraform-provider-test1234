@@ -22,9 +22,13 @@ fi
   export -- GPG_FINGERPRINT
 }
 
+set -x
+
 # Import GPG Key
 {
+  printenv -- GPG_SIGNING_KEY
   printenv -- GPG_SIGNING_KEY | gpg --batch --yes --passphrase-fd 3 --import 3<<< "$GPG_SIGNING_PASSWORD"
+  gpg --batch --list-keys
   GPG_FINGERPRINT="$(gpg --batch --list-keys --with-colons | awk -F : -- '/^pub:/ { getline; print "fingerprint=" $10 }')"
 }
 

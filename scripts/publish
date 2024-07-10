@@ -8,7 +8,6 @@ set -o pipefail dotglob nullglob failglob
   cd -- "$(dirname -- "$0")/.."
   GIT_REPO="${GIT_REPO:-"$(basename -- "$PWD")"}"
   GIT_TAG="$(git describe --tags --abbrev=0)"
-  GIT_TAG="${GIT_TAG#_}"
   VERSION="${GIT_TAG#v}"
   NAME_PREFIX="${GIT_REPO}_${VERSION}"
   MANIFEST="${NAME_PREFIX}_manifest.json"
@@ -27,7 +26,12 @@ fi
 
 # Build Artifacts
 {
-  GORELEASER_CURRENT_TAG="$GIT_TAG" goreleaser release --clean --skip publish,validate
+  SKIP=(--skip publish)
+  if [[ -z ${CI:-""} ]]; then
+    SKIP+=(--skip validate)
+  fi
+
+  GORELEASER_CURRENT_TAG="$GIT_TAG" goreleaser release --clean "${SKIP[@]}"
 }
 
 # Generate Checksum

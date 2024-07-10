@@ -51,5 +51,5 @@ fi
 # Publish Release
 if [[ -n ${CI:-""} ]]; then
   gh release upload --clobber -- "$GIT_TAG" "$DIST/$MANIFEST" "$SHAFILE" "$SIGFILE" "$DIST/"*.zip
-  gh release edit --verify-tag --latest -- "$GIT_TAG"
+  gh release edit --verify-tag --prerelease=false --latest -- "$GIT_TAG"
 fi

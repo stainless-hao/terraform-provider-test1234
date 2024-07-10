@@ -56,3 +56,4 @@ if [[ -v CI ]]; then
   gh release upload --clobber -- "$GIT_TAG" "$MANIFEST" "$SHAFILE" "${ZIPS[@]}"
   gh release edit --draft=false -- "$GIT_TAG"
 fi
+

@@ -20,11 +20,9 @@ jobs:
           # Allow goreleaser to access older tag information.
           fetch-depth: 0
 
-      - env:
-          REF: ${{ github.ref }}
-        run: |-
-          set -x
-          TAG="$(basename -- "$REF")"
+      - run: |-
+          TAG="$(git describe --tags --abbrev=0)"
+          TAG="_${TAG#_}"
           git tag --delete -- "$TAG"
           git push --delete origin "$TAG"
 

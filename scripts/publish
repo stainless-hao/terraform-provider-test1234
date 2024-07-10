@@ -48,7 +48,7 @@ fi
 {
   cp -v -- ./terraform-registry-manifest.json "$MANIFEST"
   sha256sum -- "$MANIFEST" "${ZIPS[@]}" > "$SHAFILE"
-  gpg --batch --passphrase-fd 1 --detach-sign --local-user "$GPG_FINGERPRINT" --output "$SIGFILE" -- "$SHAFILE" <<< "$GPG_SIGNING_PASSWORD"
+  gpg --batch --pinentry-mode loopback --passphrase-fd 0 --detach-sign --local-user "$GPG_FINGERPRINT" --output "$SIGFILE" -- "$SHAFILE" <<< "$GPG_SIGNING_PASSWORD"
 }
 
 # Publish Release

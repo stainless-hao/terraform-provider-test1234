@@ -20,9 +20,10 @@ set -o pipefail dotglob nullglob failglob
 
 # Pipelines
 {
+  FLAG='release.trigger'
   MAP=(xargs --no-run-if-empty -I % --)
   LIST=(gh release list --limit 99999 --json 'tagName,isPrerelease' --jq '.[] | select(.isPrerelease).tagName')
-  FILTER=(gh release view --json 'tagName,isPrerelease,assets' --jq 'if .isPrerelease and any(.assets[]; .name == "_.json") then .tagName else null end' --)
+  FILTER=(gh release view --json 'tagName,isPrerelease,assets' --jq "if .isPrerelease and any(.assets[]; .name == \"$FLAG\") then .tagName else null end" --)
   REMOVE=(gh release delete --yes -- %)
 }
 
@@ -74,10 +75,11 @@ EOF
 # Publish Release
 if [[ -n ${CI:-""} ]]; then
   gh release upload --clobber -- "$GIT_TAG" "$DIST/$MANIFEST" "$SHAFILE" "$SIGFILE" "$DIST/"*.zip
+  gh release delete-asset --yes -- "$GIT_TAG" "$FLAG"
   gh release edit --verify-tag --prerelease=false --latest -- "$GIT_TAG"
 fi
 
 # Clean Failed Releases
 if [[ -n ${CI:-""} ]]; then
-  "${LIST[@]}" | tee -- /dev/stderr | "${MAP[@]}" "${FILTER[@]}" % 
+  "${LIST[@]}" | "${MAP[@]}" "${FILTER[@]}" % | awk -- '$0 { print }' | "${MAP[@]}" "${REMOVE[@]}"
 fi

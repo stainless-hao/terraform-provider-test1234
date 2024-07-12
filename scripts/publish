@@ -83,12 +83,11 @@ fi
 if [[ -n ${CI:-""} ]]; then
   TMP="$(mktemp)"
   "${LIST[@]}" | "${MAP[@]}" "${FILTER[@]}" % | awk -- '$0 { print }' | tee -- "$TMP" | "${MAP[@]}" "${REMOVE[@]}"
+
   if [[ -s $TMP ]]; then
-    {
-      tee -- <<- 'EOF'
+    tee -- <<- 'EOF'
 The following releases have been cleaned up:
 EOF
-      nl -- "$TMP"
-    } >&2
-  fi
+    nl -- "$TMP"
+  fi >&2
 fi

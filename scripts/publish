@@ -3,6 +3,7 @@
 set -Eeu
 set -o pipefail dotglob nullglob failglob
 
+
 # Environments
 {
   cd -- "$(dirname -- "$0")/.."
@@ -38,6 +39,7 @@ EOF
   exit 1
 fi
 
+set -x
 # Smoke Test
 {
   if [[ -n ${CI:-""} ]] && ! TIMESTAMP="$("${FILTER[@]}" "$GIT_TAG" | jq --exit-status --arg tag "$GIT_TAG" 'select(.tag == $tag).time')"; then

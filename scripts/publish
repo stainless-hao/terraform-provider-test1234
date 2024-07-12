@@ -82,6 +82,7 @@ fi
 # Clean Failed Releases
 if [[ -n ${CI:-""} ]]; then
   TMP="$(mktemp)"
+  set -x
   "${LIST[@]}" | "${MAP[@]}" "${FILTER[@]}" % | awk -- '$0 { print }' | jq --argjson time "$TIMESTAMP" 'select(.createdAt | fromdateiso8601 < $time).tag' | tee -- "$TMP" | "${MAP[@]}" "${REMOVE[@]}"
   if [[ -s $TMP ]]; then
     tee -- <<- 'EOF'

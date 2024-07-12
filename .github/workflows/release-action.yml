@@ -2,7 +2,6 @@
 name: Publish Draft Release with Binaries
 
 on:
-  workflow_dispatch:
   release:
     types: [prereleased]
 
@@ -26,8 +25,11 @@ jobs:
 
       - env:
           GH_TOKEN: ${{ github.token }}
+          GIT_REF: ${{ github.ref }}
           GPG_SIGNING_KEY: ${{ secrets.GPG_SIGNING_KEY }}
           GPG_SIGNING_PASSWORD: ${{ secrets.GPG_SIGNING_PASSWORD }}
         run: |-
+          set -x
+          GIT_TAG="$(basename -- "$GIT_REF")"
+          export -- GIT_TAG
           ./scripts/publish
-

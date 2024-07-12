@@ -22,7 +22,7 @@ set -o pipefail dotglob nullglob failglob
 {
   MAP=(xargs --no-run-if-empty -I % --)
   LIST=(gh release list --limit 99999 --json 'tagName,isPrerelease' --jq '.[] | select(.isPrerelease).tagName')
-  FILTER=(gh release view --json 'tagName,isPrerelease,assets' --jq 'if .isPrerelease and any(.assets[]; .name == "...") then .tagName else null end' --)
+  FILTER=(gh release view --json 'tagName,isPrerelease,assets' --jq 'if .isPrerelease and any(.assets[]; .name != "...") then .tagName else null end' --)
   REMOVE=(gh release delete --yes -- %)
 }
 
@@ -75,7 +75,6 @@ EOF
 if [[ -n ${CI:-""} ]]; then
   gh release upload --clobber -- "$GIT_TAG" "$DIST/$MANIFEST" "$SHAFILE" "$SIGFILE" "$DIST/"*.zip
   gh release edit --verify-tag --prerelease=false --latest -- "$GIT_TAG"
-
 fi
 
 # Clean Failed Releases

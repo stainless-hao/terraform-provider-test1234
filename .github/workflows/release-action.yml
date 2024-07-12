@@ -29,7 +29,7 @@ jobs:
           GPG_SIGNING_KEY: ${{ secrets.GPG_SIGNING_KEY }}
           GPG_SIGNING_PASSWORD: ${{ secrets.GPG_SIGNING_PASSWORD }}
         run: |-
-          set -x
           GIT_TAG="$(basename -- "$GIT_REF")"
           export -- GIT_TAG
+          printenv -- GIT_TAG
           ./scripts/publish

@@ -81,4 +81,5 @@ fi
 if [[ -n ${CI:-""} ]]; then
   set -x
   "${LIST[@]}" | "${MAP[@]}" "${FILTER[@]}" % | awk -- '$0 { print }' | "${MAP[@]}" "${REMOVE[@]}"
+  set +x
 fi

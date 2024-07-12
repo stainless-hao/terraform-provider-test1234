@@ -38,7 +38,7 @@ fi
 
 # Smoke Test
 {
-  if [[ -n ${CI:-""} ]] && ! "${FILTER[@]}" "$GIT_TAG" | grep --fixed-string --quiet -- "$GIT_TAG"; then
+  if [[ -n ${CI:-""} ]] && ! "${FILTER[@]}" "$GIT_TAG" | tee -- /dev/stderr | grep --fixed-string --quiet -- "$GIT_TAG"; then
     tee -- <<- EOF >&2
 Release "$GIT_TAG" is not found in the list of pre-releases
 This might have happened because "$GIT_TAG" has been superseded by a later release

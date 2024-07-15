@@ -7,8 +7,9 @@ set -o pipefail dotglob nullglob failglob
 {
   cd -- "$(dirname -- "$0")/.."
   GIT_REPO="${GIT_REPO:-"$(basename -- "$PWD")"}"
+  LATEST_TAG="$(git tag --list --sort '-taggerdate' -- 'v*' | head -1)"
   if [[ -z ${CI:-""} ]]; then
-    GIT_TAG="$(git describe --tags --abbrev=0)"
+    GIT_TAG="$LATEST_TAG"
   fi
   VERSION="${GIT_TAG#v}"
   NAME_PREFIX="${GIT_REPO}_${VERSION}"
@@ -57,6 +58,7 @@ EOF
     SKIP+=(--skip validate)
   fi
 
+  set -x
   GORELEASER_CURRENT_TAG="$GIT_TAG" goreleaser release --clean "${SKIP[@]}"
 }
 
@@ -66,6 +68,7 @@ EOF
   pushd -- "$DIST" > /dev/null
   sha256sum -- "$MANIFEST" *.zip | tee -- "$SHAFILE" >&2
   popd > /dev/null
+  set +x
 }
 
 # Generate Signatures
@@ -76,16 +79,26 @@ EOF
 
 # Publish Release
 if [[ -n ${CI:-""} ]]; then
+  if [[ $GIT_TAG == "$LATEST_TAG" ]]; then
+    RELEASE_ARGS=(--latest)
+  else
+    RELEASE_ARGS=()
+  fi
+
+  set -x
   gh release upload --clobber -- "$GIT_TAG" "$DIST/$MANIFEST" "$SHAFILE" "$SIGFILE" "$DIST/"*.zip
   gh release delete-asset --yes -- "$GIT_TAG" "$FLAG"
-  gh release edit --verify-tag --prerelease=false --latest -- "$GIT_TAG"
+  gh release edit --verify-tag --prerelease=false "${RELEASE_ARGS[@]}" -- "$GIT_TAG"
+  set +x
 fi
 
 # Clean Failed Releases
 if [[ -n ${CI:-""} ]]; then
   TMP="$(mktemp)"
   LIST_PREV=(gh release list --limit 99999 --json 'tagName,isPrerelease,createdAt' --jq ".[] | select(.isPrerelease and (.createdAt | fromdateiso8601) < $TIMESTAMP).tagName")
+  set -x
   "${LIST_PREV[@]}" | "${MAP[@]}" "${FIND_FLAGGED[@]}" % | "${SELECT_TAGNAME[@]}" | tee -- "$TMP" | "${MAP[@]}" "${REMOVE[@]}"
+  set +x
   if [[ -s $TMP ]]; then
     tee -- <<- 'EOF'
 The following releases have been cleaned up:

@@ -30,8 +30,11 @@ set -o pipefail dotglob nullglob failglob
   REMOVE=(gh release delete --yes -- %)
 }
 
-# Import GPG Key
 if [[ -n ${GPG_SIGNING_PASSWORD:-""} ]] && [[ -n ${GPG_SIGNING_KEY:-""} ]]; then
+  tee -- <<- 'EOF' >&2
+>>> Importing GPG key
+EOF
+
   printenv -- GPG_SIGNING_KEY | gpg --batch --passphrase-fd 3 --import 3<<< "$GPG_SIGNING_PASSWORD"
 elif [[ -n ${CI:-""} ]]; then
   tee -- <<- 'EOF' >&2
@@ -40,7 +43,6 @@ EOF
   exit 1
 fi
 
-# Smoke Test
 {
   if [[ -n ${CI:-""} ]] && ! TIMESTAMP="$("${FIND_FLAGGED[@]}" "$GIT_TAG" | "${FIND_TIMESTAMP[@]}")"; then
     tee -- <<- EOF >&2
@@ -51,39 +53,53 @@ EOF
   fi
 }
 
-# Build Artifacts
 {
   SKIP=(--skip publish)
   if [[ -z ${CI:-""} ]]; then
     SKIP+=(--skip validate)
   fi
 
+  tee -- <<- 'EOF' >&2
+>>> Compiling binaries
+EOF
+
   set -x
   GORELEASER_CURRENT_TAG="$GIT_TAG" goreleaser release --clean "${SKIP[@]}"
   set +x
 }
 
-# Generate Checksum
 {
+  tee -- <<- 'EOF' >&2
+>>> Generating checksum
+EOF
+
   cp -v -- ./terraform-registry-manifest.json "$DIST/$MANIFEST"
   pushd -- "$DIST" > /dev/null
   sha256sum -- "$MANIFEST" *.zip | tee -- "$SHAFILE" >&2
   popd > /dev/null
 }
 
-# Generate Signatures
 {
+  tee -- <<- 'EOF' >&2
+>>> Generating signature
+EOF
+
   GPG_FINGERPRINT="${GPG_FINGERPRINT:-"$(gpg --batch --list-keys --with-colons | awk -F : -- '/^pub:/ { getline; print $10 }' | tail -1)"}"
   gpg --batch --pinentry-mode loopback --passphrase-fd 0 --detach-sign --local-user "$GPG_FINGERPRINT" --output "$SIGFILE" -- "$SHAFILE" <<< "${GPG_SIGNING_PASSWORD:-""}"
 }
 
 # Publish Release
 if [[ -n ${CI:-""} ]]; then
+  set -x
   if [[ $GIT_TAG == "$LATEST_TAG" ]]; then
     RELEASE_ARGS=(--latest)
   else
     RELEASE_ARGS=()
   fi
+
+  tee -- <<- 'EOF' >&2
+>>> Publishing release
+EOF
 
   set -x
   gh release upload --clobber -- "$GIT_TAG" "$DIST/$MANIFEST" "$SHAFILE" "$SIGFILE" "$DIST/"*.zip
@@ -92,8 +108,11 @@ if [[ -n ${CI:-""} ]]; then
   set +x
 fi
 
-# Clean Failed Releases
 if [[ -n ${CI:-""} ]]; then
+  tee -- <<- 'EOF' >&2
+>>> Cleaning failed releases
+EOF
+
   TMP="$(mktemp)"
   LIST_PREV=(gh release list --limit 99999 --json 'tagName,isPrerelease,createdAt' --jq ".[] | select(.isPrerelease and (.createdAt | fromdateiso8601) < $TIMESTAMP).tagName")
   set -x
@@ -106,4 +125,3 @@ EOF
     nl -- "$TMP"
   fi >&2
 fi
-

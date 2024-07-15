@@ -60,6 +60,7 @@ EOF
 
   set -x
   GORELEASER_CURRENT_TAG="$GIT_TAG" goreleaser release --clean "${SKIP[@]}"
+  set +x
 }
 
 # Generate Checksum
@@ -68,7 +69,6 @@ EOF
   pushd -- "$DIST" > /dev/null
   sha256sum -- "$MANIFEST" *.zip | tee -- "$SHAFILE" >&2
   popd > /dev/null
-  set +x
 }
 
 # Generate Signatures

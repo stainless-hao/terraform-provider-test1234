@@ -39,6 +39,7 @@ elif [[ -n ${CI:-""} ]]; then
   tee -- <<- 'EOF' >&2
 GPG_SIGNING_PASSWORD, GPG_SIGNING_KEY must be set
 EOF
+
   exit 1
 fi
 
@@ -48,19 +49,21 @@ fi
 Release "$GIT_TAG" is not found in the list of pre-releases
 This might have happened because "$GIT_TAG" has been superseded by a later release
 EOF
+
     exit 1
   fi
 }
 
 {
-  SKIP=(--skip publish)
-  if [[ -z ${CI:-""} ]]; then
-    SKIP+=(--skip validate)
-  fi
 
   tee -- <<- 'EOF' >&2
 >>> Compiling binaries
 EOF
+
+  SKIP=(--skip publish)
+  if [[ -z ${CI:-""} ]]; then
+    SKIP+=(--skip validate)
+  fi
 
   set -x
   GORELEASER_CURRENT_TAG="$GIT_TAG" goreleaser release --clean "${SKIP[@]}"
@@ -94,13 +97,13 @@ if [[ -n ${CI:-""} ]]; then
 EOF
 
   LATEST_TAG="$(gh release list --limit 1 --json 'tagName,isPrerelease' --jq '.[].tagName')"
+  set -x
   if [[ $GIT_TAG == "$LATEST_TAG" ]]; then
     RELEASE_ARGS=(--latest)
   else
     RELEASE_ARGS=()
   fi
 
-  set -x
   gh release upload --clobber -- "$GIT_TAG" "$DIST/$MANIFEST" "$SHAFILE" "$SIGFILE" "$DIST/"*.zip
   gh release delete-asset --yes -- "$GIT_TAG" "$FLAG"
   gh release edit --verify-tag --prerelease=false "${RELEASE_ARGS[@]}" -- "$GIT_TAG"
@@ -124,3 +127,4 @@ EOF
     nl -- "$TMP"
   fi >&2
 fi
+

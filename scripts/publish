@@ -49,7 +49,7 @@ if [[ -n ${CI:-""} ]]; then
 EOF
 
   set -x
-  if ! TIMESTAMP="$("${FIND_FLAGGED[@]}" "$GIT_TAG" | "${FIND_TIMESTAMP[@]}")"; then
+  if ! TIMESTAMP="$("${FIND_FLAGGED[@]}" "$GIT_TAG" | "${FIND_TIMESTAMP[@]}")" || [[ -z $TIMESTAMP ]]; then
     set +x
     tee -- <<- EOF >&2
 Release "$GIT_TAG" is not found in the list of pre-releases

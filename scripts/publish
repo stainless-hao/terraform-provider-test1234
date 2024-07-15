@@ -24,6 +24,8 @@ set -o pipefail dotglob nullglob failglob
   MAP=(xargs --no-run-if-empty -I % --)
   LIST=(gh release list --limit 99999 --json 'tagName,isPrerelease,createdAt' --jq '.[] | select(.isPrerelease) | { tag: .tagName, time: (.createdAt | fromdateiso8601) }')
   FILTER_FLAGGED=(gh release view --json 'tagName,isPrerelease,assets,createdAt' --jq "if .isPrerelease and any(.assets[]; .name == \"$FLAG\") then . else null end" --)
+  # shellcheck disable=2016
+  FILTER_STALE=(jq --argjson time "$TIMESTAMP" 'select(.createdAt | fromdateiso8601 < $time).tag')
   REMOVE=(gh release delete --yes -- %)
 }
 
@@ -37,10 +39,9 @@ EOF
   exit 1
 fi
 
-set -x
 # Smoke Test
 {
-  if [[ -n ${CI:-""} ]] && ! TIMESTAMP="$("${FILTER_FLAGGED[@]}" "$GIT_TAG" | jq --exit-status --arg tag "$GIT_TAG" 'select(.tag == $tag).time')"; then
+  if [[ -n ${CI:-""} ]] && ! TIMESTAMP="$("${FILTER_FLAGGED[@]}" "$GIT_TAG" | tee -- /dev/stderr | jq --exit-status --arg tag "$GIT_TAG" 'select(.tag == $tag).time')"; then
     tee -- <<- EOF >&2
 Release "$GIT_TAG" is not found in the list of pre-releases
 This might have happened because "$GIT_TAG" has been superseded by a later release
@@ -82,8 +83,6 @@ fi
 
 # Clean Failed Releases
 if [[ -n ${CI:-""} ]]; then
-  # shellcheck disable=2016
-  FILTER_STALE=(jq --argjson time "$TIMESTAMP" 'select(.createdAt | fromdateiso8601 < $time).tag')
   TMP="$(mktemp)"
   "${LIST[@]}" | "${MAP[@]}" "${FILTER_FLAGGED[@]}" % | awk -- '$0 { print }' | "${FILTER_STALE[@]}" | tee -- "$TMP" | "${MAP[@]}" "${REMOVE[@]}"
   if [[ -s $TMP ]]; then

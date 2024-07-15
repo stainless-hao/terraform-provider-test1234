@@ -39,7 +39,7 @@ fi
 
 # Smoke Test
 {
-  if [[ -n ${CI:-""} ]] && ! TIMESTAMP="$("${FILTER_FLAGGED[@]}" "$GIT_TAG" | tee -- /dev/stderr | jq --exit-status --arg tag "$GIT_TAG" 'select(.tag == $tag).time')"; then
+  if [[ -n ${CI:-""} ]] && ! TIMESTAMP="$("${FILTER_FLAGGED[@]}" "$GIT_TAG" | jq --exit-status --arg tag "$GIT_TAG" 'select(.tagName == $tag).createdAt | fromdateiso8601')"; then
     tee -- <<- EOF >&2
 Release "$GIT_TAG" is not found in the list of pre-releases
 This might have happened because "$GIT_TAG" has been superseded by a later release

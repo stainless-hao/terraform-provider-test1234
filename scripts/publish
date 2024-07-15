@@ -22,7 +22,6 @@ set -o pipefail dotglob nullglob failglob
 {
   FLAG='release.trigger'
   MAP=(xargs --no-run-if-empty -I % --)
-  LIST=(gh release list --limit 99999 --json 'tagName,isPrerelease,createdAt' --jq '.[] | select(.isPrerelease) | { tag: .tagName, time: (.createdAt | fromdateiso8601) }')
   FILTER_FLAGGED=(gh release view --json 'tagName,isPrerelease,assets,createdAt' --jq "if .isPrerelease and any(.assets[]; .name == \"$FLAG\") then . else null end" --)
   # shellcheck disable=2016
   FIND_TIMESTAMP=(jq --exit-status --arg tag "$GIT_TAG" 'select(.tagName == $tag).createdAt | fromdateiso8601')
@@ -85,8 +84,12 @@ fi
 if [[ -n ${CI:-""} ]]; then
   TMP="$(mktemp)"
   # shellcheck disable=2016
-  FILTER_STALE=(jq --argjson time "$TIMESTAMP" 'select(.createdAt | fromdateiso8601 < $time).tag')
-  "${LIST[@]}" | "${MAP[@]}" "${FILTER_FLAGGED[@]}" % | awk -- '$0 { print }' | "${FILTER_STALE[@]}" | tee -- "$TMP"
+  {
+    LIST=(gh release list --limit 99999 --json 'tagName,isPrerelease,createdAt' --jq ".[] | select(.isPrerelease and (.createdAt | fromdateiso8601) < $TIMESTAMP).tagName")
+    FILTER_STALE=(jq --argjson time "$TIMESTAMP" 'select(.createdAt | fromdateiso8601 < $time).tag')
+  }
+  "${LIST[@]}" | jq --exit-status '.' | "${MAP[@]}" "${FILTER_FLAGGED[@]}" % | awk -- '$0 { print }' | "${FILTER_STALE[@]}" | tee -- "$TMP"
+  # | "${MAP[@]}" "${REMOVE[@]}"
   if [[ -s $TMP ]]; then
     tee -- <<- 'EOF'
 The following releases have been cleaned up:

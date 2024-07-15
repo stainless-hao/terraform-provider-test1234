@@ -83,7 +83,7 @@ EOF
 
   cp -v -- ./terraform-registry-manifest.json "$DIST/$MANIFEST"
   pushd -- "$DIST" > /dev/null
-  sha256sum -- "$MANIFEST" *.zip | tee -- "$SHAFILE" >&2
+  sha256sum -- "$MANIFEST" *.zip > "$SHAFILE"
 }
 
 {
@@ -121,9 +121,9 @@ if [[ -n ${CI:-""} ]]; then
 EOF
 
   TMP="$(mktemp)"
-  LIST_PREV=(gh release list --limit 99999 --json 'tagName,isPrerelease,createdAt' --jq ".[] | select(.isPrerelease and (.createdAt | fromdateiso8601) < $TIMESTAMP).tagName")
+  LIST_PREVIOUS=(gh release list --limit 99999 --json 'tagName,isPrerelease,createdAt' --jq ".[] | select(.isPrerelease and (.createdAt | fromdateiso8601) < $TIMESTAMP).tagName")
   set -x
-  "${LIST_PREV[@]}" | "${MAP[@]}" "${FIND_FLAGGED[@]}" % | "${SELECT_TAGNAME[@]}" | tee -- "$TMP" | "${MAP[@]}" "${REMOVE[@]}" %
+  "${LIST_PREVIOUS[@]}" | "${MAP[@]}" "${FIND_FLAGGED[@]}" % | "${SELECT_TAGNAME[@]}" | tee -- "$TMP" | "${MAP[@]}" "${REMOVE[@]}" %
   set +x
   if [[ -s $TMP ]]; then
     tee -- <<- 'EOF'
@@ -131,4 +131,7 @@ The following releases have been cleaned up:
 EOF
     nl -- "$TMP"
   fi >&2
+
+  set -x
+  gh release view -- "$GIT_TAG"
 fi

@@ -22,10 +22,10 @@ set -o pipefail dotglob nullglob failglob
 {
   FLAG='release.trigger'
   MAP=(xargs --no-run-if-empty -I % --)
-  FILTER_FLAGGED=(gh release view --json 'tagName,isPrerelease,assets,createdAt' --jq "if .isPrerelease and any(.assets[]; .name == \"$FLAG\") then . else null end" --)
+  FIND_FLAGGED=(gh release view --json 'tagName,isPrerelease,assets,createdAt' --jq "if .isPrerelease and any(.assets[]; .name == \"$FLAG\") then . else null end" --)
   # shellcheck disable=2016
   FIND_TIMESTAMP=(jq --exit-status --arg tag "$GIT_TAG" 'select(.tagName == $tag).createdAt | fromdateiso8601')
-  COMPACT_EMPTY=(jq 'select(.)')
+  SELECT_TAGNAME=(jq 'select(.).tagName')
   REMOVE=(gh release delete --yes -- %)
 }
 
@@ -41,7 +41,7 @@ fi
 
 # Smoke Test
 {
-  if [[ -n ${CI:-""} ]] && ! TIMESTAMP="$("${FILTER_FLAGGED[@]}" "$GIT_TAG" | "${FIND_TIMESTAMP[@]}")"; then
+  if [[ -n ${CI:-""} ]] && ! TIMESTAMP="$("${FIND_FLAGGED[@]}" "$GIT_TAG" | "${FIND_TIMESTAMP[@]}")"; then
     tee -- <<- EOF >&2
 Release "$GIT_TAG" is not found in the list of pre-releases
 This might have happened because "$GIT_TAG" has been superseded by a later release
@@ -68,7 +68,7 @@ EOF
   popd > /dev/null
 }
 
-# Generate Signature
+# Generate Signatures
 {
   GPG_FINGERPRINT="${GPG_FINGERPRINT:-"$(gpg --batch --list-keys --with-colons | awk -F : -- '/^pub:/ { getline; print $10 }' | tail -1)"}"
   gpg --batch --pinentry-mode loopback --passphrase-fd 0 --detach-sign --local-user "$GPG_FINGERPRINT" --output "$SIGFILE" -- "$SHAFILE" <<< "${GPG_SIGNING_PASSWORD:-""}"
@@ -85,7 +85,7 @@ fi
 if [[ -n ${CI:-""} ]]; then
   TMP="$(mktemp)"
   LIST_PREV=(gh release list --limit 99999 --json 'tagName,isPrerelease,createdAt' --jq ".[] | select(.isPrerelease and (.createdAt | fromdateiso8601) < $TIMESTAMP).tagName")
-  "${LIST_PREV[@]}" | "${MAP[@]}" "${FILTER_FLAGGED[@]}" % | "${COMPACT_EMPTY[@]}" | tee -- "$TMP" | "${MAP[@]}" echo "${REMOVE[@]}"
+  "${LIST_PREV[@]}" | "${MAP[@]}" "${FIND_FLAGGED[@]}" % | "${SELECT_TAGNAME[@]}" | tee -- "$TMP" | "${MAP[@]}" echo "${REMOVE[@]}"
   if [[ -s $TMP ]]; then
     tee -- <<- 'EOF'
 The following releases have been cleaned up:

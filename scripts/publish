@@ -14,7 +14,7 @@ set -o pipefail dotglob nullglob failglob
   NAME_PREFIX="${GIT_REPO}_${VERSION}"
   MANIFEST="${NAME_PREFIX}_manifest.json"
   DIST="$PWD/dist"
-  SHAFILE="$DIST/${NAME_PREFIX}_SHA256SUMS"
+  SHAFILE="${NAME_PREFIX}_SHA256SUMS"
   SIGFILE="$SHAFILE.sig"
 }
 
@@ -84,7 +84,6 @@ EOF
   cp -v -- ./terraform-registry-manifest.json "$DIST/$MANIFEST"
   pushd -- "$DIST" > /dev/null
   sha256sum -- "$MANIFEST" *.zip | tee -- "$SHAFILE" >&2
-  popd > /dev/null
 }
 
 {
@@ -103,13 +102,14 @@ EOF
 
   LATEST_TAG="$(gh release list --limit 1 --json 'tagName' --jq '.[].tagName')"
   set -x
-  if [[ $GIT_TAG == "$LATEST_TAG" ]]; then
+  if [[ $GIT_TAG == "$LATEST_TAG" ]] && ! grep --quiet -e '-alpha$' -e '-beta$' <<< "$GIT_TAG"; then
     RELEASE_ARGS=(--latest)
   else
     RELEASE_ARGS=()
   fi
 
-  gh release upload --clobber -- "$GIT_TAG" "$DIST/$MANIFEST" "$SHAFILE" "$SIGFILE" "$DIST/"*.zip
+  gh release upload --clobber -- "$GIT_TAG" "$MANIFEST" "$SHAFILE" "$SIGFILE" *.zip
+  popd > /dev/null
   gh release delete-asset --yes -- "$GIT_TAG" "$FLAG"
   gh release edit --verify-tag --prerelease=false "${RELEASE_ARGS[@]}" -- "$GIT_TAG"
   set +x
@@ -132,4 +132,3 @@ EOF
     nl -- "$TMP"
   fi >&2
 fi
-

@@ -25,6 +25,7 @@ set -o pipefail dotglob nullglob failglob
   FILTER_FLAGGED=(gh release view --json 'tagName,isPrerelease,assets,createdAt' --jq "if .isPrerelease and any(.assets[]; .name == \"$FLAG\") then . else null end" --)
   # shellcheck disable=2016
   FIND_TIMESTAMP=(jq --exit-status --arg tag "$GIT_TAG" 'select(.tagName == $tag).createdAt | fromdateiso8601')
+  COMPACT_EMPTY=(jq 'select(.)')
   REMOVE=(gh release delete --yes -- %)
 }
 
@@ -83,14 +84,8 @@ fi
 # Clean Failed Releases
 if [[ -n ${CI:-""} ]]; then
   TMP="$(mktemp)"
-  # shellcheck disable=2016
-  {
-    LIST_PREV=(gh release list --limit 99999 --json 'tagName,isPrerelease,createdAt' --jq ".[] | select(.isPrerelease and (.createdAt | fromdateiso8601) < $TIMESTAMP).tagName")
-    FILTER_STALE=(jq --argjson time "$TIMESTAMP" 'select(.createdAt | fromdateiso8601 < $time).tag')
-    COMPACT_EMPTY=(jq 'select(.)')
-  }
-  "${LIST_PREV[@]}" | "${MAP[@]}" "${FILTER_FLAGGED[@]}" % | "${COMPACT_EMPTY[@]}" | "${FILTER_STALE[@]}" | tee -- "$TMP"
-  # | "${MAP[@]}" "${REMOVE[@]}"
+  LIST_PREV=(gh release list --limit 99999 --json 'tagName,isPrerelease,createdAt' --jq ".[] | select(.isPrerelease and (.createdAt | fromdateiso8601) < $TIMESTAMP).tagName")
+  "${LIST_PREV[@]}" | "${MAP[@]}" "${FILTER_FLAGGED[@]}" % | "${COMPACT_EMPTY[@]}" | tee -- "$TMP" | "${MAP[@]}" echo "${REMOVE[@]}"
   if [[ -s $TMP ]]; then
     tee -- <<- 'EOF'
 The following releases have been cleaned up:

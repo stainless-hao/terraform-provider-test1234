@@ -7,9 +7,8 @@ set -o pipefail dotglob nullglob failglob
 {
   cd -- "$(dirname -- "$0")/.."
   GIT_REPO="${GIT_REPO:-"$(basename -- "$PWD")"}"
-  LATEST_TAG="$(git tag --list --sort '-taggerdate' -- 'v*' | head -1)"
   if [[ -z ${CI:-""} ]]; then
-    GIT_TAG="$LATEST_TAG"
+    GIT_TAG="$(git tag --list --sort '-taggerdate' -- 'v*' | head -1)"
   fi
   VERSION="${GIT_TAG#v}"
   NAME_PREFIX="${GIT_REPO}_${VERSION}"
@@ -90,16 +89,16 @@ EOF
 
 # Publish Release
 if [[ -n ${CI:-""} ]]; then
-  set -x
+  tee -- <<- 'EOF' >&2
+>>> Publishing release
+EOF
+
+  LATEST_TAG="$(gh release list --limit 1 --json 'tagName,isPrerelease' --jq '.[].tagName')"
   if [[ $GIT_TAG == "$LATEST_TAG" ]]; then
     RELEASE_ARGS=(--latest)
   else
     RELEASE_ARGS=()
   fi
-
-  tee -- <<- 'EOF' >&2
->>> Publishing release
-EOF
 
   set -x
   gh release upload --clobber -- "$GIT_TAG" "$DIST/$MANIFEST" "$SHAFILE" "$SIGFILE" "$DIST/"*.zip

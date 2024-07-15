@@ -86,7 +86,7 @@ if [[ -n ${CI:-""} ]]; then
   TMP="$(mktemp)"
   # shellcheck disable=2016
   FILTER_STALE=(jq --argjson time "$TIMESTAMP" 'select(.createdAt | fromdateiso8601 < $time).tag')
-  "${LIST[@]}" | "${MAP[@]}" "${FILTER_FLAGGED[@]}" % | awk -- '$0 { print }' | "${FILTER_STALE[@]}" | tee -- /dev/stderr "$TMP" | "${MAP[@]}" "${REMOVE[@]}"
+  "${LIST[@]}" | "${MAP[@]}" "${FILTER_FLAGGED[@]}" % | awk -- '$0 { print }' | "${FILTER_STALE[@]}" | tee -- "$TMP"
   if [[ -s $TMP ]]; then
     tee -- <<- 'EOF'
 The following releases have been cleaned up:

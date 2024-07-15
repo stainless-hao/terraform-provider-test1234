@@ -135,3 +135,4 @@ EOF
   set -x
   gh release view -- "$GIT_TAG"
 fi
+

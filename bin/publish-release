@@ -24,6 +24,7 @@ set -o pipefail dotglob nullglob failglob
 }
 
 {
+
   # we store argv in arrays, for both documentation and composition
   # arrays are preferred over functions for more consistent composition semantics
 

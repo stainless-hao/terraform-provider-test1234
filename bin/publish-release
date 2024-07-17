@@ -3,13 +3,18 @@
 set -Eeu
 set -o pipefail dotglob nullglob failglob
 
-# Environments
 {
   cd -- "$(dirname -- "$0")/.."
+
+  # we use a special flag file to differentiate pre-releases created via the `release-please` bot
+  FLAG_FILE='version.go'
   GIT_REPO="${GIT_REPO:-"$(basename -- "$PWD")"}"
+
+  # most CIs have the `CI` environ set, `-z` and `-n` are used test for its emptiness instead of `-v`, to support macOS with implicit `BASH_COMPAT=32`
   if [[ -z ${CI:-""} ]]; then
     GIT_TAG="$(git tag --list --sort '-taggerdate' -- 'v*' | head -1)"
   fi
+
   VERSION="${GIT_TAG#v}"
   NAME_PREFIX="${GIT_REPO}_${VERSION}"
   MANIFEST="${NAME_PREFIX}_manifest.json"
@@ -18,11 +23,13 @@ set -o pipefail dotglob nullglob failglob
   SIG_FILE="$SHA_FILE.sig"
 }
 
-# Pipelines
 {
-  FLAG='version.go'
+  # we store argv in arrays, for both documentation and composition
+  # arrays are preferred over functions for more consistent composition semantics
+
   MAP=(xargs --no-run-if-empty -I % --)
-  FIND_FLAGGED=(gh release view --json 'tagName,isPrerelease,assets,createdAt' --jq "if .isPrerelease and any(.assets[]; .name == \"$FLAG\") then . else null end" --)
+  MOST_RECENT_LINE=(tail -1)
+  FIND_FLAGGED=(gh release view --json 'tagName,isPrerelease,assets,createdAt' --jq "if .isPrerelease and any(.assets[]; .name == \"$FLAG_FILE\") then . else null end" --)
   # shellcheck disable=2016
   FIND_TIMESTAMP=(jq --exit-status --arg tag "$GIT_TAG" 'select(.tagName == $tag).createdAt | fromdateiso8601')
   IS_THIS_PRERELEASE=(gh release view --json 'isPrerelease' --jq '.isPrerelease' -- "$GIT_TAG")
@@ -30,77 +37,66 @@ set -o pipefail dotglob nullglob failglob
   REMOVE=(gh release delete --yes --)
 }
 
-if [[ -n ${GPG_SIGNING_PASSWORD:-""} ]] && [[ -n ${GPG_SIGNING_KEY:-""} ]]; then
-  tee -- <<- 'EOF' >&2
-==> Importing GPG key
-EOF
+{
+  # import GPG key from environ if possible
+  # fail if GPG key not imported during CI execution
 
-  printenv -- GPG_SIGNING_KEY | gpg --batch --passphrase-fd 3 --import 3<<< "$GPG_SIGNING_PASSWORD"
-elif [[ -n ${CI:-""} ]]; then
-  tee -- <<- 'EOF' >&2
-GPG_SIGNING_PASSWORD, GPG_SIGNING_KEY must be set
-EOF
-
-  exit 1
-fi
-
-if [[ -n ${CI:-""} ]]; then
-  tee -- <<- 'EOF' >&2
-==> Checking pre-releases
-EOF
-
-  set -x
-  if ! TIMESTAMP="$("${FIND_FLAGGED[@]}" "$GIT_TAG" | "${FIND_TIMESTAMP[@]}")" || [[ -z $TIMESTAMP ]]; then
-    set +x
-    if "${IS_THIS_PRERELEASE[@]}" | grep --fixed-strings --quiet -- 'false'; then
-
-      exec -- tee -- <<- EOF >&2
-Exiting: "$GIT_TAG" has already been released
-EOF
-    fi
-
-    tee -- <<- EOF >&2
-Release "$GIT_TAG" is not found in the list of pre-releases
-This might have happened because "$GIT_TAG" has been released or superseded by a later release
-EOF
-
+  if [[ -n ${GPG_SIGNING_PASSWORD:-""} ]] && [[ -n ${GPG_SIGNING_KEY:-""} ]]; then
+    printf -- '%s\n' '==> Importing GPG key' >&2
+    printenv -- GPG_SIGNING_KEY | gpg --batch --passphrase-fd 3 --import 3<<< "$GPG_SIGNING_PASSWORD"
+  elif [[ -n ${CI:-""} ]]; then
+    printf -- '%s\n' 'GPG_SIGNING_PASSWORD, GPG_SIGNING_KEY must be set' >&2
     exit 1
   fi
-  set +x
-fi
+}
 
 {
-  tee -- <<- 'EOF' >&2
-==> Compiling binaries
-EOF
+  # set -x, set +x pattern is used to print important statements
+  # >>> DO NOT USE THEM <<< WITH STATEMENTS THAT HANDLE SECRETS
 
+  if [[ -n ${CI:-""} ]]; then
+    printf -- '%s\n' '==> Checking pre-releases' >&2
+    set -x
+    if ! TIMESTAMP="$("${FIND_FLAGGED[@]}" "$GIT_TAG" | "${FIND_TIMESTAMP[@]}")" || [[ -z $TIMESTAMP ]]; then
+      set +x
+      if "${IS_THIS_PRERELEASE[@]}" | grep --fixed-strings --quiet -- 'false'; then
+        printf -- '%s\n' "Exiting: '$GIT_TAG' has already been released" >&2
+        exit 0
+      else
+        printf -- '%s\n' "Release '$GIT_TAG' is not found in the list of pre-releases" "This might have happened because '$GIT_TAG' has been released or superseded by a later release" >&2
+        exit 1
+      fi
+    fi
+    set +x
+  fi
+}
+
+{
+  # skip some validations locally
+
+  printf -- '%s\n' '==> Compiling binaries' >&2
   SKIP=(--skip publish)
   if [[ -z ${CI:-""} ]]; then
     SKIP+=(--skip validate)
   fi
-
   set -x
   GORELEASER_CURRENT_TAG="$GIT_TAG" goreleaser release --clean "${SKIP[@]}"
   set +x
 }
 
 {
-  tee -- <<- 'EOF' >&2
-==> Generating checksum
-EOF
-
+  printf -- '%s\n' '==> Generating checksum' >&2
   cp -v -- ./terraform-registry-manifest.json "$DIST/$MANIFEST"
+  # chdir into build dir to ensure only minimal path is compiled
   pushd -- "$DIST" > /dev/null
   sha256sum -- "$MANIFEST" *.zip > "$SHA_FILE"
 }
 
 {
-  tee -- <<- 'EOF' >&2
-==> Generating signature
-EOF
+  printf -- '%s\n' '==> Generating signature' >&2
 
-  MOST_RECENT_KEY=(tail -1)
-  GPG_FINGERPRINT="${GPG_FINGERPRINT:-"$(gpg --batch --list-keys --with-colons | awk -F : -- '/^pub:/ { getline; print $10 }' | "${MOST_RECENT_KEY[@]}")"}"
+  # parse `gpg`'s porcelain for fingerprints
+  GPG_FINGERPRINT="${GPG_FINGERPRINT:-"$(gpg --batch --list-keys --with-colons | awk -F : -- '/^pub:/ { getline; print $10 }' | "${MOST_RECENT_LINE[@]}")"}"
   set -x
   GPG_SIGN=(gpg --batch --detach-sign --local-user "$GPG_FINGERPRINT" --output "$SIG_FILE")
   set +x
@@ -111,43 +107,52 @@ EOF
   fi
 }
 
-if [[ -n ${CI:-""} ]]; then
-  tee -- <<- 'EOF' >&2
-==> Publishing release
-EOF
+{
+  # if a release's tag contain `-`, Terraform registry will recognize it as a semaver pre-release
+  # we do not mark pre-releases with the `latest` flag
+  # we still publish them as regular releases because otherwise Terraform registry does not pull them
 
-  LATEST_TAG="$(gh release list --limit 1 --json 'tagName' --jq '.[].tagName')"
-  set -x
-  if [[ $GIT_TAG == "$LATEST_TAG" ]] && ! grep --quiet -e '-alpha$' -e '-beta$' <<< "$GIT_TAG"; then
-    RELEASE_ARGS=(--latest)
-  else
-    RELEASE_ARGS=()
+  if [[ -n ${CI:-""} ]]; then
+    printf -- '%s\n' '==> Publishing release' >&2
+
+    LATEST_TAG="$(gh release list --limit 1 --json 'tagName' --jq '.[].tagName')"
+
+    set -x
+    if [[ $GIT_TAG == "$LATEST_TAG" ]] && [[ $GIT_TAG != *-* ]]; then
+      RELEASE_ARGS=(--latest)
+    else
+      RELEASE_ARGS=()
+    fi
+
+    # upload binaries to pre-release
+    gh release upload --clobber -- "$GIT_TAG" "$MANIFEST" "$SHA_FILE" "$SIG_FILE" *.zip
+    popd > /dev/null
+    # convert pre-release to regular release, triggering Terraform registry webhooks
+    gh release edit --verify-tag --prerelease=false "${RELEASE_ARGS[@]}" -- "$GIT_TAG"
+    # remove flag file from release assets
+    gh release delete-asset --yes -- "$GIT_TAG" "$FLAG_FILE"
+    set +x
   fi
+}
 
-  gh release upload --clobber -- "$GIT_TAG" "$MANIFEST" "$SHA_FILE" "$SIG_FILE" *.zip
-  popd > /dev/null
-  gh release delete-asset --yes -- "$GIT_TAG" "$FLAG"
-  gh release edit --verify-tag --prerelease=false "${RELEASE_ARGS[@]}" -- "$GIT_TAG"
-  set +x
-fi
+{
+  # garbage collect any pre-releases marked with the flag file previous to current release
+  # these could have accrued due to failed CI runs
 
-if [[ -n ${CI:-""} ]]; then
-  tee -- <<- 'EOF' >&2
-==> Cleaning failed releases
-EOF
+  if [[ -n ${CI:-""} ]]; then
+    printf -- '%s\n' '==> Garbage collect failed pre-releases' >&2
 
-  TMP="$(mktemp)"
-  LIST_PREVIOUS=(gh release list --limit 99999 --json 'tagName,isPrerelease,createdAt' --jq ".[] | select(.isPrerelease and (.createdAt | fromdateiso8601) < $TIMESTAMP).tagName")
-  set -x
-  "${LIST_PREVIOUS[@]}" | "${MAP[@]}" "${FIND_FLAGGED[@]}" % | "${SELECT_TAGNAME[@]}" | tee -- "$TMP" | "${MAP[@]}" "${REMOVE[@]}" %
-  set +x
-  if [[ -s $TMP ]]; then
-    tee -- <<- 'EOF'
-The following releases have been cleaned up:
-EOF
-    nl -- "$TMP"
-  fi >&2
+    TMP="$(mktemp)"
+    LIST_PREVIOUS=(gh release list --limit 99999 --json 'tagName,isPrerelease,createdAt' --jq ".[] | select(.isPrerelease and (.createdAt | fromdateiso8601) < $TIMESTAMP).tagName")
+    set -x
+    "${LIST_PREVIOUS[@]}" | "${MAP[@]}" "${FIND_FLAGGED[@]}" % | "${SELECT_TAGNAME[@]}" | tee -- "$TMP" | "${MAP[@]}" "${REMOVE[@]}" %
+    set +x
+    if [[ -s $TMP ]]; then
+      printf -- '%s\n' 'The following releases have been cleaned up:'
+      nl -- "$TMP"
+    fi >&2
 
-  set -x
-  gh release view -- "$GIT_TAG"
-fi
+    set -x
+    gh release view -- "$GIT_TAG"
+  fi
+}

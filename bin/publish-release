@@ -14,13 +14,13 @@ set -o pipefail dotglob nullglob failglob
   NAME_PREFIX="${GIT_REPO}_${VERSION}"
   MANIFEST="${NAME_PREFIX}_manifest.json"
   DIST="$PWD/dist"
-  SHAFILE="${NAME_PREFIX}_SHA256SUMS"
-  SIGFILE="$SHAFILE.sig"
+  SHA_FILE="${NAME_PREFIX}_SHA256SUMS"
+  SIG_FILE="$SHA_FILE.sig"
 }
 
 # Pipelines
 {
-  FLAG='release.trigger'
+  FLAG='version.go'
   MAP=(xargs --no-run-if-empty -I % --)
   FIND_FLAGGED=(gh release view --json 'tagName,isPrerelease,assets,createdAt' --jq "if .isPrerelease and any(.assets[]; .name == \"$FLAG\") then . else null end" --)
   # shellcheck disable=2016
@@ -91,7 +91,7 @@ EOF
 
   cp -v -- ./terraform-registry-manifest.json "$DIST/$MANIFEST"
   pushd -- "$DIST" > /dev/null
-  sha256sum -- "$MANIFEST" *.zip > "$SHAFILE"
+  sha256sum -- "$MANIFEST" *.zip > "$SHA_FILE"
 }
 
 {
@@ -99,8 +99,16 @@ EOF
 ==> Generating signature
 EOF
 
-  GPG_FINGERPRINT="${GPG_FINGERPRINT:-"$(gpg --batch --list-keys --with-colons | awk -F : -- '/^pub:/ { getline; print $10 }' | tail -1)"}"
-  gpg --batch --pinentry-mode loopback --passphrase-fd 0 --detach-sign --local-user "$GPG_FINGERPRINT" --output "$SIGFILE" -- "$SHAFILE" <<< "${GPG_SIGNING_PASSWORD:-""}"
+  MOST_RECENT_KEY=(tail -1)
+  GPG_FINGERPRINT="${GPG_FINGERPRINT:-"$(gpg --batch --list-keys --with-colons | awk -F : -- '/^pub:/ { getline; print $10 }' | "${MOST_RECENT_KEY[@]}")"}"
+  set -x
+  GPG_SIGN=(gpg --batch --detach-sign --local-user "$GPG_FINGERPRINT" --output "$SIG_FILE")
+  set +x
+  if [[ -v GPG_SIGNING_PASSWORD ]]; then
+    "${GPG_SIGN[@]}" --pinentry-mode loopback --passphrase-fd 0 -- "$SHA_FILE" <<< "$GPG_SIGNING_PASSWORD"
+  else
+    "${GPG_SIGN[@]}" -- "$SHA_FILE"
+  fi
 }
 
 if [[ -n ${CI:-""} ]]; then
@@ -116,7 +124,7 @@ EOF
     RELEASE_ARGS=()
   fi
 
-  gh release upload --clobber -- "$GIT_TAG" "$MANIFEST" "$SHAFILE" "$SIGFILE" *.zip
+  gh release upload --clobber -- "$GIT_TAG" "$MANIFEST" "$SHA_FILE" "$SIG_FILE" *.zip
   popd > /dev/null
   gh release delete-asset --yes -- "$GIT_TAG" "$FLAG"
   gh release edit --verify-tag --prerelease=false "${RELEASE_ARGS[@]}" -- "$GIT_TAG"

@@ -1,35 +1,45 @@
 ---
-name: Publish Draft Release with Binaries
+# This workflow is triggered when a GitHub release is created.
+# It can also be run manually to re-publish to Sonatype in case it failed for some reason.
+# You can run this workflow by navigating to https://www.github.com/stainless-sdks/terraform-provider-sink/actions/workflows/publish-sonatype.yml
+name: Publish Release
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish
 
 on:
   release:
     types: [prereleased]
 
-permissions:
-  contents: write
-
 jobs:
   publish:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
         with:
-          # Allow goreleaser to access older tag information.
           fetch-depth: 0
 
-      - uses: actions/setup-go@v5
+      - name: Set up Golang
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.19"
 
-      - uses: goreleaser/goreleaser-action@v6
+      - name: Install GoReleaser
+        uses: goreleaser/goreleaser-action@v6
         with:
           install-only: true
 
-      - env:
+      - name: Build and Publish
+        env:
+          GPG_SIGNING_KEY: ${{ secrets.SINK_GPG_SIGNING_KEY || secrets.GPG_SIGNING_KEY }}
+          GPG_SIGNING_PASSWORD: ${{ secrets.SINK_GPG_SIGNING_PASSWORD || secrets.GPG_SIGNING_PASSWORD }}
           GH_TOKEN: ${{ github.token }}
           GIT_REF: ${{ github.ref }}
-          GPG_SIGNING_KEY: ${{ secrets.GPG_SIGNING_KEY }}
-          GPG_SIGNING_PASSWORD: ${{ secrets.GPG_SIGNING_PASSWORD }}
         run: |-
           GIT_TAG="$(basename -- "$GIT_REF")"
           export -- GIT_TAG
-          printenv -- GIT_TAG
-          ./scripts/publish
+          bash ./bin/publish-release

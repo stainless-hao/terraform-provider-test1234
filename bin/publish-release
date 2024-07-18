@@ -128,7 +128,7 @@ set -o pipefail dotglob nullglob failglob
     gh release upload --clobber -- "$GIT_TAG" "$MANIFEST" "$SHA_FILE" "$SIG_FILE" *.zip
     popd > /dev/null
     # convert pre-release to regular release, triggering Terraform registry webhooks
-    gh release edit --verify-tag "${RELEASE_ARGS[@]}" -- "$GIT_TAG"
+    # gh release edit --verify-tag "${RELEASE_ARGS[@]}" -- "$GIT_TAG"
     # remove flag file from release assets
     gh release delete-asset --yes -- "$GIT_TAG" "$FLAG_FILE"
     set +x

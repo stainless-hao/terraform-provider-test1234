@@ -156,3 +156,4 @@ set -o pipefail dotglob nullglob failglob
     gh release view -- "$GIT_TAG"
   fi
 }
+

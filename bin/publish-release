@@ -24,7 +24,6 @@ set -o pipefail dotglob nullglob failglob
 }
 
 {
-
   # we store argv in arrays, for both documentation and composition
   # arrays are preferred over functions for more consistent composition semantics
 
@@ -109,7 +108,7 @@ set -o pipefail dotglob nullglob failglob
 }
 
 {
-  # if a release's tag contain `-`, Terraform registry will recognize it as a semaver pre-release
+  # if a release's tag contain `-`, Terraform registry will recognize it as a semver pre-release
   # we do not mark pre-releases with the `latest` flag
   # we still publish them as regular releases because otherwise Terraform registry does not pull them
 
